@@ -52,6 +52,42 @@ class transactionsView(ModelView):
     base_order = ('post_date','desc')
 
 
+class R72View(ModelView):
+    datamodel = SQLAInterface(R72)
+    list_columns = ['Date','Close']
+
+class fundsView(ModelView):
+    datamodel = SQLAInterface(funds)
+    list_columns = [
+    'name',
+    'amount',
+    'tax',
+    'price',
+    'request',
+    'gain',
+    'date',
+    'scan',
+    'comms',
+    'isActive']
+
+class stocksView(ModelView):
+    datamodel = SQLAInterface(stocks)
+    list_columns = [
+    'symbol',
+    'amount',
+    'price',
+    'date',
+    'gain',
+    'tax',
+    'scan',
+    'comms',
+    'isActive',
+    'fee'
+    ]
+
+class monitorView(ModelView):
+    datamodel = SQLAInterface(monitor)
+
 
 from .forms import *
 import secrets
@@ -152,6 +188,42 @@ appbuilder.add_view(
     icon="fa-group",
     label="add transfer",
     category="Transactions",
+    category_icon="fa-cogs",
+)
+
+appbuilder.add_view(
+    R72View,
+    "R72",
+    icon="fa-group",
+    label="R72",
+    category="Trading",
+    category_icon="fa-cogs",
+)
+
+appbuilder.add_view(
+    fundsView,
+    "funds",
+    icon="fa-group",
+    label="funds",
+    category="Trading",
+    category_icon="fa-cogs",
+)
+
+appbuilder.add_view(
+    stocksView,
+    "stocks",
+    icon="fa-group",
+    label="stocks",
+    category="Trading",
+    category_icon="fa-cogs",
+)
+
+appbuilder.add_view(
+    monitorView,
+    "monitor",
+    icon="fa-group",
+    label="monitor",
+    category="Trading",
     category_icon="fa-cogs",
 )
 

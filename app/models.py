@@ -1,5 +1,6 @@
 from flask_appbuilder import Model
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import *
+from flask_appbuilder.models.mixins import *
 from sqlalchemy.orm import relationship
 
 
@@ -70,3 +71,37 @@ class splits(Model):
 	def __repr__(self):
 		return self.value_num/self.value_denom
 
+
+class R72(Model):
+	Close = Column(Float())
+	Date = Column(Date, primary_key=True)
+
+class funds(Model):
+	name = Column(String())
+	amount = Column(Float())
+	tax = Column(Float())
+	price = Column(Float())
+	request = Column(String())
+	gain = Column(Float())
+	date = Column(Date())
+	scan = Column(FileColumn())
+	comms = Column(String())
+	isActive = Column(Boolean())
+	id = Column(Integer, primary_key=True)
+
+class monitor(Model):
+	id = Column(Integer, primary_key=True)
+	code = Column(String())
+
+class stocks(Model):
+	symbol = Column(String())
+	amount = Column(Float())
+	price = Column(Float())
+	date = Column(Date())
+	gain = Column(Float())
+	tax = Column(Float())
+	scan = Column(FileColumn())
+	comms = Column(String())
+	isActive = Column(Boolean())
+	fee = Column(Float())
+	id = Column(Integer, primary_key=True)
