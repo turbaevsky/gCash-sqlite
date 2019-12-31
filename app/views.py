@@ -6,6 +6,9 @@ from . import appbuilder, db
 from flask_appbuilder.views import *
 from .models import *
 
+#from app import app
+#from flask_appbuilder import expose, has_access, permission_name
+
 class commoditiesView(ModelView):
     datamodel = SQLAInterface(commodities)
     list_columns = [
@@ -224,6 +227,26 @@ appbuilder.add_view(
     icon="fa-group",
     label="monitor",
     category="Trading",
+    category_icon="fa-cogs",
+)
+
+############################
+
+appbuilder.add_link(
+    "showAll",
+    href="/api/v1/reportapi/info/showAll",
+    icon="fa-group",
+    label="showAll",
+    category="Info",
+    category_icon="fa-cogs",
+)
+
+appbuilder.add_link(
+    "showRest",
+    href="/info/showRest",
+    icon="fa-group",
+    label="showRest",
+    category="Info",
     category_icon="fa-cogs",
 )
 
