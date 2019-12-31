@@ -1,0 +1,4 @@
+- [ ] fix pandas uwsgi issue (functions.py)
+- [ ] add all the web2py functionality and charts (default.py and stock.py)
+- [ ] integrate and schedule hsbs tracker there
+- [ ] integrate stock finder and indices tracker
