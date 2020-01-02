@@ -2,3 +2,5 @@
 - [ ] add all the web2py functionality and charts (default.py and stock.py)
 - [ ] integrate and schedule hsbs tracker there
 - [ ] integrate stock finder and indices tracker
+- [ ] check API routing (view.py)
+- [ ] check gain claculation (functions.py)

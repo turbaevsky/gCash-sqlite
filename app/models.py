@@ -16,7 +16,7 @@ class commodities(Model):
 	quote_tz = Column(String())
 
 	def __repr__(self):
-		return '{}'.format(self.mnemonic)	
+		return '{}'.format(self.mnemonic)
 
 class transactions(Model):
 	guid = Column(String, primary_key=True)
@@ -30,6 +30,9 @@ class transactions(Model):
 
 	def __repr__(self):
 		return '{}: {}'.format(self.post_date, self.description)
+
+	def month_year(self):
+		return datetime.datetime(self.post_date.year, self.post_date.month, 1)
 
 
 class accounts(Model):
@@ -71,6 +74,8 @@ class splits(Model):
 	def __repr__(self):
 		return self.value_num/self.value_denom
 
+	def value(self):
+		return self.value_num/self.value_denom
 
 class R72(Model):
 	Close = Column(Float())

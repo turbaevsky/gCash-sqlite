@@ -9,6 +9,8 @@ from flask_appbuilder.security.manager import (
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
+#APPLICATION_ROOT = '/demo'
+
 # Your App secret key
 SECRET_KEY = "\2\1thisismyscretkey\1\2\e\y\y\h"
 
