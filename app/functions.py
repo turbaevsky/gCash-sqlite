@@ -8,7 +8,6 @@ from flask_appbuilder.security.decorators import * #protect
 import time 		 # TODO load only neccesary libs
 
 from flask import Flask, render_template
-import plotly.express as px
 from sqlalchemy import create_engine
 
 import plotly.io as pio
@@ -177,6 +176,8 @@ class monthreportApi(BaseApi):
 	@protect(allow_browser_login=True)
 	def monthReport(self):
 
+		import plotly.express as px
+
 		engine = create_engine('sqlite:///004.sqlite')
 		conn = engine.connect()
 
@@ -193,9 +194,9 @@ class monthreportApi(BaseApi):
 
 		#dates = pd.date_range(end='2021-01-31', periods=16, freq='1M').strftime("%Y-%m-%d").values
 		dates = ['2019-10-31', '2019-11-30', '2019-12-31', '2020-01-31',
-       '2020-02-29', '2020-03-31', '2020-04-30', '2020-05-31',
-       '2020-06-30', '2020-07-31', '2020-08-31', '2020-09-30',
-       '2020-10-31', '2020-11-30', '2020-12-31', '2021-01-31']
+	   '2020-02-29', '2020-03-31', '2020-04-30', '2020-05-31',
+	   '2020-06-30', '2020-07-31', '2020-08-31', '2020-09-30',
+	   '2020-10-31', '2020-11-30', '2020-12-31', '2021-01-31']
 		# TODO: remove hardcode
 
 		for i in range(len(dates)-1):
@@ -251,6 +252,7 @@ class monthreportApi(BaseApi):
 
 		return render_template('plot.html', fig1=fig1, fig2=fig2)
 
+
 	@expose('/info/rest')
 	@protect(allow_browser_login=True)
 	def rest(self):
@@ -297,6 +299,153 @@ class monthreportApi(BaseApi):
 			willRest='{} will rest by the end of 2020'.format(rest), \
 			upTo = u,
 			)
+
+
+	@expose('/info/indices')
+	@protect(allow_browser_login=True)
+	def plotIndices(self, depth = 400):
+		import pandas as pd
+		import plotly.express as px
+		import app.TA2 as TA2
+		from sklearn import preprocessing
+		import plotly.graph_objects as go
+		# fill the indeces
+
+		dji = yahoo2('^DJI','1d', period=depth)
+		ftse = yahoo2('^FTSE','1d', period=depth)
+
+		dji.Date = dji.Date.apply(lambda x: x[0:9])
+		ftse.Date = ftse.Date.apply(lambda x: x[0:9])
+
+		engine = create_engine('sqlite:///004.sqlite')
+		conn = engine.connect()
+
+		hsbc = pd.DataFrame.from_dict(conn.execute('select * from R72',as_dict = True))
+		hsbc.columns = ['Close','Date']
+
+		hsbc.Date = hsbc.Date.apply(lambda x: (datetime.strptime(x,'%Y-%m-%d').strftime("%d %b %y")))
+		hsbc['RealMACD'] = TA2.MACD(hsbc,12,26)['MACD_12_26']
+
+		#shift = 90
+		dji = TA2.MACD(dji,12,26).tail(depth)#['MACD_12_26']
+		dji = TA2.STO(dji,10,10,3)
+		ftse = TA2.MACD(ftse,12,26).tail(depth)#['MACD_12_26']
+		ftse = TA2.STO(ftse,10,10,3)
+		hsbc = hsbc.tail(depth)
+
+		macd=ftse.merge(dji,on='Date',how='left',copy=False).\
+			drop(['Open_x','Open_y','High_x','High_y','Low_x','Low_y','MACDsign_12_26_x',
+			  'MACDsign_12_26_y','MACDdiff_12_26_x','MACDdiff_12_26_y','Volume_x','Volume_y',
+			  'SO%d10_x','SO%d10_y'],axis=1)
+
+		macd = macd.merge(hsbc,on='Date',how='left',copy=False)#.dropna()
+		macd.columns = ['Date','FTSE','FTSE_MACD','FTSE_K','DJI','DJI_MACD','DJI_K','R72','R72_re_MACD']  #,'R72_im_MACD','R72_im']
+		#macd = macd.dropna().drop_duplicates(subset=['Date'])
+
+		min_max_scaler = preprocessing.MinMaxScaler()
+
+		coef_x, coef_y = 0.76764361, 0.42319705
+
+		for c in macd.columns:
+			macd[c] = min_max_scaler.fit_transform(macd[c].values.reshape(-1, 1)) if c != 'Date' else macd[c]
+
+			macd['R72_im_MACD'] = macd.DJI_MACD*coef_x+macd.FTSE_MACD*coef_y
+			macd.R72_im_MACD = min_max_scaler.fit_transform(macd.R72_im_MACD.values.reshape(-1, 1))
+			macd['R72_im'] = macd.DJI*coef_x+macd.FTSE*coef_y
+			macd.R72_im = min_max_scaler.fit_transform(macd.R72_im.values.reshape(-1, 1))
+			macd['R72_im_K'] = macd.DJI_K*coef_x+macd.FTSE_K*coef_y
+			macd.R72_im_MACD = min_max_scaler.fit_transform(macd.R72_im_MACD.values.reshape(-1, 1))
+
+			macd = macd.tail(depth) ##################################### cut the DF 
+
+			# https://mdipierro.github.io/Publications/2011-web2py-for-Scientific-Applications.pdf
+			# https://www.quora.com/Is-there-a-way-to-use-Plotly-with-web2py
+
+		plot = {}
+		plot['macd'] = go.Figure({
+			'data': [
+				{'y': macd.DJI_MACD.values.tolist(), 'type': 'scatter', 'name': 'DJI', 'x': macd.Date},
+				{'y': macd.FTSE_MACD.values.tolist(), 'type': 'scatter', 'name': 'FTSE', 'x': macd.Date},
+				{'y': macd.R72_im_MACD.values.tolist(), 'type': 'scatter', 'name': 'R72_im', 'x': macd.Date},
+				{'y': macd.R72_re_MACD.values.tolist(), 'type': 'scatter', 'name': 'R72_re', 'x': macd.Date},
+					],
+			'layout': go.Layout(xaxis=go.XAxis(title='Date'), 
+			yaxis=go.YAxis(title='MACD for main Indices'))
+			})#, include_plotlyjs=False, output_type='div')
+
+		plot['sto'] = go.Figure({
+			'data': [
+			{'y': macd.DJI_K.values.tolist(), 'type': 'scatter', 'name': 'DJI', 'x': macd.Date},
+			{'y': macd.FTSE_K.values.tolist(), 'type': 'scatter', 'name': 'FTSE', 'x': macd.Date},
+			{'y': macd.R72_im_K.values.tolist(), 'type': 'scatter', 'name': 'HSBC im', 'x': macd.Date},
+			#{'y': macd.R72_re_K.values.tolist(), 'type': 'scatter', 'name': 'R72_re'},
+				],
+			'layout': go.Layout(xaxis=go.XAxis(title='Date'), 
+			yaxis=go.YAxis(title='STO for main Indices'))
+			})#, include_plotlyjs=False, output_type='div')
+
+		plot['norm'] = go.Figure({
+			'data': [
+			{'y': macd.DJI.tolist(), 'type': 'scatter', 'name': 'DJI', 'x': macd.Date},
+			{'y': macd.FTSE.tolist(), 'type': 'scatter', 'name': 'FTSE', 'x': macd.Date},
+			{'y': macd.R72_im.tolist(), 'type': 'scatter', 'name': 'HSBC im', 'x': macd.Date},
+			{'y': macd.R72.tolist(), 'type': 'scatter', 'name': 'real HSBC', 'x': macd.Date},
+				],
+			'layout': go.Layout(xaxis=go.XAxis(title='Date'), 
+			yaxis=go.YAxis(title='Normilised values for main Indices'))
+			})#, include_plotlyjs=False, output_type='div')
+
+		plot['r72'] = go.Figure({
+			'data': [
+			{'y': hsbc.Close.tolist(), 'type': 'scatter', 'name': 'R72_re', 'x': hsbc.Date},
+				 ],
+			'layout': go.Layout(xaxis=go.XAxis(title='Date'), 
+			yaxis=go.YAxis(title='Real R72'))
+			})#, include_plotlyjs=False, output_type='div')
+
+		return render_template('plot.html', fig1=pio.to_html(plot['macd']), fig2=pio.to_html(plot['sto']),
+			fig3=pio.to_html(plot['norm']), fig4=pio.to_html(plot['r72']))
+
+
+def yahoo2(sym='^DJI', freq='1d', period=15, offset=1):
+	import pandas as pd
+	"""
+	@return dataframe for symbol
+	@param period monitoring period in DAYS
+	@param freq frequencies fo data [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
+	@param offset timezone difference to UTC
+	@url 'https://query1.finance.yahoo.com/v8/finance/chart/{0}?symbol={0}'
+	'&period1={1}&period2={2}&interval={3}&'
+	'includePrePost=true&events=div%7Csplit%7Cearn&lang=en-US&'
+	'region=US&crumb=t5QZMhgytYZ&corsDomain=finance.yahoo.com'
+	1 - starting time UNIX UTC
+	2 - ending time UNIX UTC
+	3 - period as above
+	"""
+	end = int(time.time())
+	print(end, period) 
+	start = int(end-3600*24*period)
+	url = ('https://query1.finance.yahoo.com/v8/finance/chart/{0}?symbol={0}'
+		'&period1={1}&period2={2}&interval={3}&'
+		'includePrePost=true&events=div%7Csplit%7Cearn&lang=en-US&'
+		'region=UK&crumb=t5QZMhgytYZ&corsDomain=finance.yahoo.com').format(sym, start, end, freq)
+	#print(url)
+	r = pd.read_json(url).chart.result
+	df = pd.DataFrame({'Date':r[0]['timestamp'],
+					   'Close':r[0]['indicators']['quote'][0]['close'],
+					   'Open':r[0]['indicators']['quote'][0]['open'],
+					   'High':r[0]['indicators']['quote'][0]['high'],
+					   'Low':r[0]['indicators']['quote'][0]['low'],
+					   'Volume':r[0]['indicators']['quote'][0]['volume']})#.dropna(subset=['Close'])
+	df.Date = df.Date.apply(lambda x: pd.to_datetime(int(x)+3600*offset, unit='s').strftime('%d %b %y %H:%M'))
+	df.Close = df.Close.apply(lambda x: round(x,2))
+	df.Open = df.Open.apply(lambda x: round(x,2))
+	df.High = df.High.apply(lambda x: round(x,2))
+	df.Low = df.Low.apply(lambda x: round(x,2) if x>0 else None)
+	#df.Low = df.Low.apply(lambda x: min(df.Close, df.Open) if x==0 else round(x,2))
+	df.Volume = df.Volume.apply(lambda x: round(x,2))
+	return df.dropna(subset=['Close','Low'])
+
 
 
 appbuilder.add_api(reportApi)

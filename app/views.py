@@ -279,6 +279,14 @@ appbuilder.add_link(
     category_icon="fa-cogs",
 )
 
+appbuilder.add_link(
+    "yahoo",
+    href="/cash/api/v1/monthreportapi/info/indices",
+    icon="fa-group",
+    label="plot indices",
+    category="Trading",
+    category_icon="fa-cogs",
+)
 
 #appbuilder.add_view(splitsChartView, "Show Chart", icon="fa-dashboard", category="Pictures")
 

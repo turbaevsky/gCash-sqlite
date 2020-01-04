@@ -1,6 +1,6 @@
-- [ ] fix pandas uwsgi issue (functions.py)
-- [ ] add all the web2py functionality and charts (default.py and stock.py)
+- [X] fix pandas uwsgi issue (functions.py): **it seems pandas works INSIDE classes but not when module booting**
+- [ ] add all the web2py functionality and charts (default.py DONE and stock.py)
 - [ ] integrate and schedule hsbs tracker there
 - [ ] integrate stock finder and indices tracker
-- [ ] check API routing (view.py)
+- [X] check API routing (view.py)
 - [ ] check gain claculation (functions.py)
