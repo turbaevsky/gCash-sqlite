@@ -5,12 +5,9 @@ from datetime import date, timedelta
 from flask_appbuilder.api import BaseApi, expose
 from . import appbuilder
 from flask_appbuilder.security.decorators import * #protect
-
-import pandas as pd  # TODO load only neccesary libs
 import time 		 # TODO load only neccesary libs
-#from flask import flash
 
-#@app.route('/info/showAll')
+
 class reportApi(BaseApi):
 	@expose('/info/showAll')
 	@protect(allow_browser_login=True)
@@ -46,8 +43,8 @@ class reportApi(BaseApi):
 
 		#return self.response(200, message=locals())
 		return {'gbp':gbp, 'debit':debit, 'future':future, 'Lena':Lena, 'credit':credit, 'cash':cash, 'saving':saving,
-		'depo':depo, 'pFunds':pFunds, 'pShares':pShares, 'usd':usd, 'eur':eur, 'uah':uah, 'allGBP':allGBP,
-		'allTogether': allTogether}
+		'depo':depo, 'pFunds':pFunds, 'pShares':pShares, 'usd':usd, 'eur':eur, 'uah_cash':getSum([12]), 
+		'uah_Kiev':getSum([13]), 'allGBP':allGBP, 'allTogether': allTogether}
 
 
 def getSum(aList=[], future=False):
@@ -119,7 +116,8 @@ def gain(sym, fund=False):
 		buy = df[0]['amount']*df[0]['long']
 		tax = df[0]['tax']
 		date = df[0]['date']
-		diff = (pd.to_datetime('today') - pd.to_datetime(date)).days
+		#diff = (pd.to_datetime('today') - pd.to_datetime(date)).days
+		# TODO: implement dimedelta calculation
 		tax = df[0]['amount']*current*tax*0.01/365*diff
 		sell = df[0]['amount']*current - tax
 		gain = (int(sell-buy))
@@ -129,10 +127,12 @@ def gain(sym, fund=False):
 
 
 def cur(sym):
-	''' read current quote from yahoo '''
+	''' read current quote from yahoo NO PANDAS'''
+	import urllib.request, json 
 	url = 'https://query1.finance.yahoo.com/v7/finance/quote?symbols='+sym
-	#print(url)
-	r = pd.read_json(url).quoteResponse.result[0]
+	with urllib.request.urlopen(url) as url:
+		r = json.loads(url.read().decode())
+		r = r['quoteResponse']['result'][0]
 	return {'price':r['regularMarketPrice'], 
 			'change': round(r['regularMarketChangePercent'],2),
 			'low': r['regularMarketDayLow'], 
@@ -171,9 +171,7 @@ class monthreportApi(BaseApi):
 	def monthReport(self):
 
 		from flask import Flask, render_template
-		import pandas as pd
 		import plotly.express as px
-		import plotly
 		from datetime import datetime
 		from sqlalchemy import create_engine
 
@@ -184,15 +182,23 @@ class monthreportApi(BaseApi):
 		engine = create_engine('sqlite:///004.sqlite')
 		conn = engine.connect()
 
+		cons_dict = {"date":[], "sum":[], "type":[]}
+		inc_dict = {"date":[], "sum":[], "type":[]}
 
 		session = db.session()
 
 		acc = ['"36ca6c050017fb0411f0429072eb94f9"','"bf57f831079e04fdfffaaa77b5c6c50b"',
 			   '"6cdb149b59eb612e1093e57710e2292a"','"4f514a136423e51d60d91de4215a6263"']
+
 		expences = dict()
 		today = datetime.today()
-		df = incomes = pd.DataFrame()
-		dates = pd.date_range(end='2021-01-31', periods=16, freq='1M').strftime("%Y-%m-%d").values
+
+		#dates = pd.date_range(end='2021-01-31', periods=16, freq='1M').strftime("%Y-%m-%d").values
+		dates = ['2019-10-31', '2019-11-30', '2019-12-31', '2020-01-31',
+       '2020-02-29', '2020-03-31', '2020-04-30', '2020-05-31',
+       '2020-06-30', '2020-07-31', '2020-08-31', '2020-09-30',
+       '2020-10-31', '2020-11-30', '2020-12-31', '2021-01-31']
+		# TODO: remove hardcode
 
 		for i in range(len(dates)-1):
 			start = dates[i]
@@ -204,7 +210,7 @@ class monthreportApi(BaseApi):
 				"c6008ebaab83653b94284597ad844ff2","281a489ce89414170f2c215f451f8b78")) \
 				and hidden=0')
 
-			cons = conn.execute("select a.name, sum(s.value_num*826/c.cusip)/c.fraction s from transactions t \
+			cons = conn.execute("select a.name name, sum(s.value_num*826/c.cusip)/c.fraction s from transactions t \
 				left join splits s on t.guid = s.tx_guid inner \
 				join accounts a on a.guid = s.account_guid inner join commodities c \
 				on c.guid = t.currency_guid \
@@ -214,7 +220,13 @@ class monthreportApi(BaseApi):
 				and t.description not in ('None','Transfer','Credit') \
 				group by s.account_guid".format(start, end, ','.join(["'"+a[0]+"'" for a in to_acc])))
 
-			cons = [{column: value for column, value in rowproxy.items()} for rowproxy in cons]
+			cons = [{column: value for column, value in rowproxy.items()} for rowproxy in cons]	
+
+			for c in cons:
+				cons_dict['date'].append(end)
+				cons_dict['sum'].append(c['s'])
+				cons_dict['type'].append(c['name'])
+
 
 			inc = conn.execute("select a.name, abs(sum(s.value_num*826/c.cusip)/c.fraction) s from transactions t \
 				left join splits s on t.guid = s.tx_guid inner \
@@ -230,27 +242,14 @@ class monthreportApi(BaseApi):
 
 			inc = [{column: value for column, value in rowproxy.items()} for rowproxy in inc if rowproxy]
 
-			# expencies report
-			df = df.append(pd.DataFrame(data = {'date':[str(end)[:10] for _ in range(len(cons))],
-				'type':[a['name'] for a in cons],
-				'amount':[a['s'] for a in cons]}), ignore_index=True)
-			# incomes
-			incomes = incomes.append(pd.DataFrame(data = {'date':[str(end)[:10] for _ in range(len(inc))],
-				'type':[a['name'] for a in inc],
-				'amount':[a['s'] for a in inc]}), ignore_index=True)
+			for c in inc:
+				inc_dict['date'].append(end)
+				inc_dict['sum'].append(c['s'])
+				inc_dict['type'].append(c['name'])
 
-		# plotting
 		
-		fig1 = pio.to_html(px.bar(df, x="date", y="amount", color='type'))#.show(renderer='iframe')
-		#fig1.update_layout(yaxis_type="log")
-		#fig1.show()
-		#graphJSON = json.dumps(fig1, cls=plotly.utils.PlotlyJSONEncoder)
-		#print(graphJSON)
-
-		fig2 = pio.to_html(px.bar(incomes, x="date", y="amount", color='type'))#.show(renderer='iframe')
-		#fig2.update_layout(yaxis_type="log")
-		#fig2.show()
-		#div = offplot.plot(fig, show_link=False, output_type="div", include_plotlyjs=False)
+		fig1 = pio.to_html(px.bar(cons_dict, x="date", y="sum", color='type'))
+		fig2 = pio.to_html(px.bar(inc_dict, x="date", y="sum", color='type'))
 
 		return render_template('plot.html', fig1=fig1, fig2=fig2)
 

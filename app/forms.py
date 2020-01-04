@@ -12,7 +12,7 @@ s = db.session()
 class addTransaction(DynamicForm):
 	f_acc = SelectField('From', 
 		choices = [(g.guid, g.name) for g in s.query(accounts).filter(accounts.placeholder==1).
-		filter(accounts.account_type=='ASSET')])
+		filter(accounts.account_type.in_(['ASSET','CASH']))])
 	to_acc = SelectField('to', 
 		choices = [(g.guid, g.name) for g in s.query(accounts).filter(accounts.placeholder==1).
 		filter(accounts.account_type=='EXPENSE')])
@@ -28,7 +28,7 @@ class addTransaction(DynamicForm):
 class addTransfer(addTransaction):
 		to_acc = SelectField('to', 
 		choices = [(g.guid, g.name) for g in s.query(accounts).filter(accounts.placeholder==1).
-		filter(accounts.account_type=='ASSET')])
+		filter(accounts.account_type.in_(['ASSET','CASH']))])
 		desc = StringField(default='Transfer')
 
 
