@@ -321,7 +321,9 @@ class monthreportApi(BaseApi):
 		conn = engine.connect()
 
 		hsbc = pd.DataFrame.from_dict(conn.execute('select * from R72',as_dict = True))
-		hsbc.columns = ['Close','Date']
+		hsbc.columns = ['Close','Date','id']
+		hsbc = hsbc.drop(['id'],axis=1)
+		#print(hsbc)
 
 		hsbc.Date = hsbc.Date.apply(lambda x: (datetime.strptime(x,'%Y-%m-%d').strftime("%d %b %y")))
 		hsbc['RealMACD'] = TA2.MACD(hsbc,12,26)['MACD_12_26']

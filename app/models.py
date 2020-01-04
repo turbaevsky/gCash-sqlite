@@ -79,7 +79,8 @@ class splits(Model):
 
 class R72(Model):
 	Close = Column(Float())
-	Date = Column(Date, primary_key=True)
+	Date = Column(Date())
+	id = Column(Integer, primary_key=True)
 
 class funds(Model):
 	name = Column(String())
