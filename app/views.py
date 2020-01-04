@@ -288,6 +288,15 @@ appbuilder.add_link(
     category_icon="fa-cogs",
 )
 
+appbuilder.add_link(
+    "pewscan",
+    href="/cash/api/v1/monthreportapi/info/prescan",
+    icon="fa-group",
+    label="Prescan stocks",
+    category="Trading",
+    category_icon="fa-cogs",
+)
+
 #appbuilder.add_view(splitsChartView, "Show Chart", icon="fa-dashboard", category="Pictures")
 
 

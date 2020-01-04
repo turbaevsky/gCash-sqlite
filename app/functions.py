@@ -13,6 +13,8 @@ from sqlalchemy import create_engine
 import plotly.io as pio
 import json
 
+import app.TA2 as TA2
+
 
 class reportApi(BaseApi):
 	@expose('/info/showAll')
@@ -172,6 +174,21 @@ def getEx():
 
 
 class monthreportApi(BaseApi):
+
+	@expose('/info/prescan')
+	@protect(allow_browser_login=True)
+	def findStock(self):
+		engine = create_engine('sqlite:///004.sqlite')
+		conn = engine.connect()
+
+		lst = conn.execute('select code from ftse100', as_dict=True)
+		scanned = prescan(lst)
+
+		conn.close()
+
+		return dict(scanned=scanned)
+
+
 	@expose('/info/monthly')
 	@protect(allow_browser_login=True)
 	def monthReport(self):
@@ -250,6 +267,8 @@ class monthreportApi(BaseApi):
 		fig1 = pio.to_html(px.bar(cons_dict, x="date", y="sum", color='type'))
 		fig2 = pio.to_html(px.bar(inc_dict, x="date", y="sum", color='type'))
 
+		conn.close()
+
 		return render_template('plot.html', fig1=fig1, fig2=fig2)
 
 
@@ -294,6 +313,9 @@ class monthreportApi(BaseApi):
 		u = 'saving enough until {} {} (spenging {} per month) incl. {} ({} per month) correction for 2020 for utilities, food and education,\
 			 and {} renting for Nov and Dec 2020'\
 			.format(mn[int(restMn)], restYr, avg, int(corr2020), int(corr2020/12), rent2020)
+
+		conn.close()
+
 		return dict(yr2020='currently {}, corrected {} will be spent in 2020'.\
 			format(int(s[0]['sum']), int(s[0]['sum'])-corr2020-rent2020), \
 			willRest='{} will rest by the end of 2020'.format(rest), \
@@ -306,7 +328,6 @@ class monthreportApi(BaseApi):
 	def plotIndices(self, depth = 400):
 		import pandas as pd
 		import plotly.express as px
-		import app.TA2 as TA2
 		from sklearn import preprocessing
 		import plotly.graph_objects as go
 		# fill the indeces
@@ -327,6 +348,8 @@ class monthreportApi(BaseApi):
 
 		hsbc.Date = hsbc.Date.apply(lambda x: (datetime.strptime(x,'%Y-%m-%d').strftime("%d %b %y")))
 		hsbc['RealMACD'] = TA2.MACD(hsbc,12,26)['MACD_12_26']
+
+		conn.close()
 
 		#shift = 90
 		dji = TA2.MACD(dji,12,26).tail(depth)#['MACD_12_26']
@@ -447,6 +470,108 @@ def yahoo2(sym='^DJI', freq='1d', period=15, offset=1):
 	#df.Low = df.Low.apply(lambda x: min(df.Close, df.Open) if x==0 else round(x,2))
 	df.Volume = df.Volume.apply(lambda x: round(x,2))
 	return df.dropna(subset=['Close','Low'])
+
+
+def extremum(data):
+	a1,a2,a3 = data
+	if float(a1) < float(a2) and float(a2) > float(a3):
+		return 'top'
+	elif float(a1) > float(a2) and float(a2) < float(a3):
+		return 'bott'
+	elif float(a1) > float(a2) and float(a2) > float(a3):
+		return 'down'
+	elif float(a1) < float(a2) and float(a2) < float(a3):
+		return 'up'
+	else:
+		return '--'
+
+
+def fund(sym):
+	''' get fundamental indo from yahoo '''
+	url = 'https://query1.finance.yahoo.com/v7/finance/quote?symbols='+sym
+	r = pd.read_json(url).quoteResponse.result[0]
+	#for k,v in zip(r.keys(),r.values()):
+	#	print(k, v)
+	'''
+	If earnings in the first half of the year, represented by the most recent two quarters, are trending lower, 
+	the P/E ratio will be higher than 20x. This tells analysts that the stock may actually be overvalued at the 
+	current price given its declining level of earnings.
+	'''
+	return {'earningDate': datetime.fromtimestamp(r['earningsTimestamp']).strftime('%b %d'), 
+			'trailingPE': round(r['trailingPE'],2),
+			'fiftyDayAverageChangePercent': round(r['fiftyDayAverageChangePercent'],2),
+			'epsTrailingTwelveMonths': r['epsTrailingTwelveMonths'],
+			'epsForward': r['epsForward'],
+			'forwardPE': round(r['forwardPE'],3),
+			'regularMarketPreviousClose': r['regularMarketPreviousClose'],
+			'regularMarketPrice': r['regularMarketPrice'],
+			'priceHint': r['priceHint'],
+			'regularMarketOpen': r['regularMarketOpen'],
+			'regularMarketDayHigh': r['regularMarketDayHigh'],
+			'regularMarketDayLow': r['regularMarketDayLow'],
+			'regularMarketChangePercent': round(r['regularMarketChangePercent'],2),
+			'regularMarketVolume': r['regularMarketVolume'],
+			'averageDailyVolume10Day': r['averageDailyVolume10Day'],
+			'shortName': r['shortName'],
+			'symbol': r['symbol']}
+
+
+def prescan(lst):
+	''' define the best stocks for trending basing on MACD '''
+	selected = {}
+	# scan daily charts
+	for l in lst:
+		l = l[0]
+		print('scanning {}...'.format(l))
+		try:
+			df = yahoo2(l,'1d',90)
+			#print(df.tail())
+		except:
+			print('Error')
+			continue
+		if len(df):
+			df['macd'] = TA2.MACD(df,12,26)['MACD_12_26']
+			macd = TA2.MACD(df,12,26).tail(3)['MACD_12_26'].values
+			#print(macd,macd[1])
+			M = extremum(macd)
+			print(M)
+			if (M=='bott' and macd[1]<0):
+				try:
+					f = fund(l) # fundamental data
+					flash = ('{} added to the shortlist; 50-days change is {}; earning date is {}'\
+					  .format(f['shortName'],f['fiftyDayAverageChangePercent'],f['earningDate']))
+					# TODO: add 30-min initial data
+				except:
+					pass
+				selected[l] = {'macd':M}
+			else:
+				print(M)
+	#with open('prescan.json', 'w') as outfile:
+	#	json.dump(selected, outfile)
+	return selected
+
+
+def hsbc_morningstar(fund='F00000UOBO'):
+	'''
+	return date, price and change for fund
+	'''
+	import re, urllib
+	url = 'http://www.morningstar.co.uk/uk/funds/snapshot/snapshot.aspx?id='+fund
+	page = urllib.request.urlopen(url).read().decode('utf-8')
+	m = re.search(r'NAV<span class="heading"><br />(\d{2}/\d{2}/\d{4})',page)
+	resp = [m.group(1)]
+	m = re.search(r'GBP\W*(\d{1}\.\d{2})',page)
+	resp.append(m.group(1))
+	m = re.search(r'Day Change</td><td class="line">\W*</td><td class="line text">(\W*\w*\d+\.\d+%)',page)
+	resp.append(m.group(1))
+	return resp
+
+def mMon(sym, freq = '15m', period = 1):
+	''' monitor MACD direction changing, hist for historical period '''
+	df = yahoo2(sym, freq, period)
+	macd = TA2.MACD(df,12,26).dropna(subset=['Close']).tail(3)['MACD_12_26'].values
+	M = extremum(macd)
+	return M
 
 
 
