@@ -13,8 +13,6 @@ from sqlalchemy import create_engine
 import plotly.io as pio
 import json
 
-import app.TA2 as TA2
-
 
 class reportApi(BaseApi):
 	@expose('/info/showAll')
@@ -330,6 +328,7 @@ class monthreportApi(BaseApi):
 		import plotly.express as px
 		from sklearn import preprocessing
 		import plotly.graph_objects as go
+		import app.TA2 as TA2
 		# fill the indeces
 
 		dji = yahoo2('^DJI','1d', period=depth)
@@ -517,6 +516,7 @@ def fund(sym):
 
 
 def prescan(lst):
+	import app.TA2 as TA2
 	''' define the best stocks for trending basing on MACD '''
 	selected = {}
 	# scan daily charts
