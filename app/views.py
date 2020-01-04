@@ -270,6 +270,15 @@ appbuilder.add_link(
 	category_icon="fa-cogs",
 )
 
+appbuilder.add_link(
+    "show rest estimation",
+    href="/cash/api/v1/monthreportapi/info/rest",
+    icon="fa-group",
+    label="show rest estimation",
+    category="Info",
+    category_icon="fa-cogs",
+)
+
 
 #appbuilder.add_view(splitsChartView, "Show Chart", icon="fa-dashboard", category="Pictures")
 

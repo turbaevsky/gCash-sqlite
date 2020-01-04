@@ -1,11 +1,18 @@
 from . import db
 from .models import *
 from app import app
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from flask_appbuilder.api import BaseApi, expose
 from . import appbuilder
 from flask_appbuilder.security.decorators import * #protect
 import time 		 # TODO load only neccesary libs
+
+from flask import Flask, render_template
+import plotly.express as px
+from sqlalchemy import create_engine
+
+import plotly.io as pio
+import json
 
 
 class reportApi(BaseApi):
@@ -170,22 +177,13 @@ class monthreportApi(BaseApi):
 	@protect(allow_browser_login=True)
 	def monthReport(self):
 
-		from flask import Flask, render_template
-		import plotly.express as px
-		from datetime import datetime
-		from sqlalchemy import create_engine
-
-		import plotly.io as pio
-		import json
-
-
 		engine = create_engine('sqlite:///004.sqlite')
 		conn = engine.connect()
 
 		cons_dict = {"date":[], "sum":[], "type":[]}
 		inc_dict = {"date":[], "sum":[], "type":[]}
 
-		session = db.session()
+		#session = db.session()
 
 		acc = ['"36ca6c050017fb0411f0429072eb94f9"','"bf57f831079e04fdfffaaa77b5c6c50b"',
 			   '"6cdb149b59eb612e1093e57710e2292a"','"4f514a136423e51d60d91de4215a6263"']
@@ -253,11 +251,21 @@ class monthreportApi(BaseApi):
 
 		return render_template('plot.html', fig1=fig1, fig2=fig2)
 
+	@expose('/info/rest')
+	@protect(allow_browser_login=True)
+	def rest(self):
+
 		# the same for 2020
-		'''
+		acc = ['"36ca6c050017fb0411f0429072eb94f9"','"bf57f831079e04fdfffaaa77b5c6c50b"',
+		'"6cdb149b59eb612e1093e57710e2292a"','"4f514a136423e51d60d91de4215a6263"']
+		
 		start = '2020-01-01'
 		end = '2020-12-31'
-		s = conn.execute("select sum(s.value_num)/100 \
+
+		engine = create_engine('sqlite:///004.sqlite')
+		conn = engine.connect()
+
+		s = conn.execute("select sum(s.value_num)/100 sum \
 		from transactions t left join splits s on t.guid = s.tx_guid inner \
 		join accounts a on a.guid = s.account_guid inner join commodities c \
 		on c.guid = t.currency_guid \
@@ -267,15 +275,16 @@ class monthreportApi(BaseApi):
 		and t.description not in ('None','Transfer','Credit') \
 		order by t.post_date".format(start, end, ','.join(acc)))
 
-		
-		rest = int(gnucash()['allTogether']) + int(s[0][0])
+		s = [{column: value for column, value in rowproxy.items()} for rowproxy in s]	
+
+		r = reportApi()
+
+		rest = int(r.gnucash()['allTogether']) + int(s[0]['sum'])
 		avg = 2000
 		corr2020 = (112+50+28+24+21+37+75/3+33+300)*12
-		corr2019 = 0
 		rent2020 = 975*2
 		# add rest
 		rest -= corr2020
-		rest -= corr2019
 		rest -= rent2020
 		mn = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 		restYr = 2021+int(rest/(avg*12))
@@ -283,15 +292,11 @@ class monthreportApi(BaseApi):
 		u = 'saving enough until {} {} (spenging {} per month) incl. {} ({} per month) correction for 2020 for utilities, food and education,\
 			 and {} renting for Nov and Dec 2020'\
 			.format(mn[int(restMn)], restYr, avg, int(corr2020), int(corr2020/12), rent2020)
-		return dict(#ex=expences, \
-			yr2020='currently {}, corrected {} will be spent in 2020'.format(int(s[0][0]), int(s[0][0])-corr2020-rent2020), \
+		return dict(yr2020='currently {}, corrected {} will be spent in 2020'.\
+			format(int(s[0]['sum']), int(s[0]['sum'])-corr2020-rent2020), \
 			willRest='{} will rest by the end of 2020'.format(rest), \
 			upTo = u,
-			img1 = XML(pio.to_html(fig1)),
-			img2 = XML(pio.to_html(fig2))
 			)
-		'''
-
 
 
 appbuilder.add_api(reportApi)
