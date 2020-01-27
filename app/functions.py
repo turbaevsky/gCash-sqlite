@@ -337,6 +337,8 @@ class monthreportApi(BaseApi):
 		dji.Date = dji.Date.apply(lambda x: x[0:9])
 		ftse.Date = ftse.Date.apply(lambda x: x[0:9])
 
+		d, f = dji, ftse
+
 		engine = create_engine('sqlite:///004.sqlite')
 		conn = engine.connect()
 
@@ -427,8 +429,24 @@ class monthreportApi(BaseApi):
 			yaxis=go.YAxis(title='Real R72'))
 			})#, include_plotlyjs=False, output_type='div')
 
+
+		plot['dji'] = go.Figure(data=[go.Candlestick(x=d['Date'],
+                open=d['Open'], high=d['High'],
+                low=d['Low'], close=d['Close'])
+                     ])
+
+		plot['dji'].update_layout(xaxis_rangeslider_visible=False)
+
+		plot['ftse'] = go.Figure(data=[go.Candlestick(x=f['Date'],
+                open=f['Open'], high=f['High'],
+                low=f['Low'], close=f['Close'])
+                     ])
+
+		plot['ftse'].update_layout(xaxis_rangeslider_visible=False)
+
 		return render_template('plot.html', fig1=pio.to_html(plot['macd']), fig2=pio.to_html(plot['sto']),
-			fig3=pio.to_html(plot['norm']), fig4=pio.to_html(plot['r72']))
+			fig3=pio.to_html(plot['norm']), fig4=pio.to_html(plot['r72']),
+			fig5=pio.to_html(plot['dji']), fig6=pio.to_html(plot['ftse']))
 
 
 def yahoo2(sym='^DJI', freq='1d', period=15, offset=1):

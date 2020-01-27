@@ -3,6 +3,9 @@ import logging
 from flask import Flask
 from flask_appbuilder import AppBuilder, SQLA
 
+from datetime import timedelta
+from flask import session, app
+
 """
  Logging configuration
 """
@@ -15,6 +18,10 @@ app.config.from_object("config")
 db = SQLA(app)
 appbuilder = AppBuilder(app, db.session)
 
+@app.before_request
+def make_session_permanent():
+    session.permanent = True
+    app.permanent_session_lifetime = timedelta(minutes=5)
 
 """
 from sqlalchemy.engine import Engine
